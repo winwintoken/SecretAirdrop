@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {FHE, euint64, externalEuint64, ebool} from "@fhevm/solidity/lib/FHE.sol";
 import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 import {ConfidentialToken} from "./ConfidentialToken.sol";
+import "hardhat/console.sol";
 
 /**
  * @title SecretAirdrop
@@ -16,8 +17,8 @@ contract SecretAirdrop is SepoliaConfig {
 
     struct AirdropInfo {
         euint64 amount; // Encrypted airdrop amount
-        bool claimed;   // Whether the airdrop has been claimed
-        bool exists;    // Whether the airdrop entry exists
+        bool claimed; // Whether the airdrop has been claimed
+        bool exists; // Whether the airdrop entry exists
     }
 
     // Contract state
@@ -25,13 +26,13 @@ contract SecretAirdrop is SepoliaConfig {
     address public immutable projectOwner;
     euint64 private totalDeposited;
     euint64 private totalClaimed;
-    
+
     // Mapping from recipient address to their airdrop information
     mapping(address => AirdropInfo) public airdrops;
-    
+
     // Array to keep track of all recipients
     address[] public recipients;
-    
+
     // Events
     event TokensDeposited(address indexed projectOwner, uint256 indexed timestamp);
     event AirdropConfigured(address indexed recipient, uint256 indexed timestamp);
@@ -58,7 +59,7 @@ contract SecretAirdrop is SepoliaConfig {
         projectOwner = msg.sender;
         totalDeposited = FHE.asEuint64(0);
         totalClaimed = FHE.asEuint64(0);
-        
+
         // Initialize error codes
         NO_ERROR = FHE.asEuint64(0);
         INSUFFICIENT_BALANCE = FHE.asEuint64(1);
@@ -74,17 +75,18 @@ contract SecretAirdrop is SepoliaConfig {
      */
     function depositTokens(externalEuint64 encryptedAmount, bytes calldata inputProof) external onlyProjectOwner {
         euint64 amount = FHE.fromExternal(encryptedAmount, inputProof);
-        
+        console.log("depositTokens 1");
         // Transfer encrypted tokens from project owner to this contract
+        FHE.allowTransient(amount, address(confidentialToken));
         confidentialToken.confidentialTransferFrom(msg.sender, address(this), amount);
-        
+        console.log("depositTokens 2");
         // Update total deposited
         totalDeposited = FHE.add(totalDeposited, amount);
-        
+        console.log("depositTokens 3");
         // Grant access permissions
         FHE.allowThis(totalDeposited);
         FHE.allow(totalDeposited, msg.sender);
-        
+        console.log("depositTokens 4");
         emit TokensDeposited(msg.sender, block.timestamp);
     }
 
@@ -100,25 +102,25 @@ contract SecretAirdrop is SepoliaConfig {
         bytes calldata inputProof
     ) external onlyProjectOwner {
         require(_recipients.length == encryptedAmounts.length, "Recipients and amounts length mismatch");
-        
+
         for (uint256 i = 0; i < _recipients.length; i++) {
             address recipient = _recipients[i];
             euint64 amount = FHE.fromExternal(encryptedAmounts[i], inputProof);
-            
+
             // If this is a new recipient, add to recipients array
             if (!airdrops[recipient].exists) {
                 recipients.push(recipient);
                 airdrops[recipient].exists = true;
             }
-            
+
             // Update airdrop information
             airdrops[recipient].amount = amount;
             airdrops[recipient].claimed = false;
-            
+
             // Grant access permissions
             FHE.allowThis(amount);
             FHE.allow(amount, recipient);
-            
+
             emit AirdropConfigured(recipient, block.timestamp);
         }
     }
@@ -128,46 +130,46 @@ contract SecretAirdrop is SepoliaConfig {
      */
     function claimAirdrop() external {
         AirdropInfo storage airdropInfo = airdrops[msg.sender];
-        
+
         // Check if airdrop exists
         if (!airdropInfo.exists) {
             _setError(msg.sender, NO_AIRDROP);
             return;
         }
-        
+
         // Check if already claimed
         if (airdropInfo.claimed) {
             _setError(msg.sender, ALREADY_CLAIMED);
             return;
         }
-        
+
         // Get the airdrop amount
         euint64 claimAmount = airdropInfo.amount;
-        
+
         // Check if contract has sufficient balance (encrypted check)
         euint64 remainingBalance = FHE.sub(totalDeposited, totalClaimed);
         ebool canClaim = FHE.le(claimAmount, remainingBalance);
-        
+
         // Conditional transfer based on balance check
         euint64 transferAmount = FHE.select(canClaim, claimAmount, FHE.asEuint64(0));
-        
+
         // Update state conditionally
         euint64 errorCode = FHE.select(canClaim, NO_ERROR, INSUFFICIENT_BALANCE);
         _setError(msg.sender, errorCode);
-        
+
         // Mark as claimed if successful
         airdropInfo.claimed = true;
-        
+
         // Update total claimed
         totalClaimed = FHE.add(totalClaimed, transferAmount);
-        
+
         // Transfer tokens to claimant
         confidentialToken.confidentialTransfer(msg.sender, transferAmount);
-        
+
         // Grant access permissions
         FHE.allowThis(totalClaimed);
         FHE.allow(totalClaimed, msg.sender);
-        
+
         emit AirdropClaimed(msg.sender, block.timestamp);
     }
 
@@ -251,11 +253,11 @@ contract SecretAirdrop is SepoliaConfig {
      */
     function _setError(address user, euint64 errorCode) private {
         lastError[user] = errorCode;
-        
+
         // Grant access permissions for error
         FHE.allowThis(errorCode);
         FHE.allow(errorCode, user);
-        
+
         emit Error(user, 0); // Emit generic error event
     }
 
@@ -266,7 +268,7 @@ contract SecretAirdrop is SepoliaConfig {
     function emergencyWithdraw(address to) external onlyProjectOwner {
         euint64 remainingBalance = FHE.sub(totalDeposited, totalClaimed);
         confidentialToken.confidentialTransfer(to, remainingBalance);
-        
+
         // Grant access permissions
         FHE.allowThis(remainingBalance);
         FHE.allow(remainingBalance, to);

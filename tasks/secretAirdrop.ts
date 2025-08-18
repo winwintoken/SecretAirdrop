@@ -59,6 +59,26 @@ task("task:wrap")
     console.log(`Transaction hash: ${tx.hash}`);
   });
 
+
+// Task: Set operator for ctoken transfers
+task("task:approve-ctoken", "Approve contract as operator for ctoken")
+  .addParam("contract", "Address of the airdrop contract")
+  .addParam("ctoken", "Address of the ctoken contract")
+  .setAction(async function (taskArguments: TaskArguments, { ethers }) {
+    const [signer] = await ethers.getSigners();
+    const ctoken = await ethers.getContractAt("ConfidentialToken", taskArguments.ctoken);
+
+    const until = Math.floor(Date.now() / 1000) + 100000
+    console.log("🔐 Approving platform as operator...");
+
+    // User directly calls setOperator on cUSDT contract
+    const approveTx = await ctoken.setOperator(taskArguments.contract, until);
+    await approveTx.wait();
+
+    console.log("✅ Platform approved as operator");
+    console.log("Transaction:", approveTx.hash);
+  });
+
 task("task:deposit")
   .addParam("contract", "SecretAirdrop contract address")
   .addParam("amount", "Amount of encrypted tokens to deposit")
@@ -66,12 +86,12 @@ task("task:deposit")
   .setAction(async function (taskArguments: TaskArguments, { ethers, fhevm }) {
     const { contract, amount } = taskArguments;
     const [signer] = await ethers.getSigners();
-
+    await fhevm.initializeCLIApi();
     const secretAirdropContract = await ethers.getContractAt("SecretAirdrop", contract);
 
     // Create encrypted input for deposit
     const input = fhevm.createEncryptedInput(contract, signer.address);
-    input.add32(parseInt(amount));
+    input.add64(parseInt(amount) * 1000000);
     const encryptedInput = await input.encrypt();
 
     console.log(`Depositing ${amount} encrypted tokens into SecretAirdrop...`);
