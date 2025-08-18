@@ -1,69 +1,98 @@
-# React + TypeScript + Vite
+# Secret Airdrop App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React + Vite frontend application for confidential token airdrops using Zama's FHE technology, built with Rainbow Kit for wallet connections and Viem for blockchain interactions.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Project Setup**: Configure contract addresses and manage token operations
+- **Claim Airdrop**: Users can claim their confidential airdrops
+- **Status Dashboard**: View airdrop statistics and recipient status
+- **Wallet Integration**: Seamless wallet connection with Rainbow Kit
+- **FHE Support**: Confidential operations using Zama's FHEVM
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **React 19** - Modern React with latest features
+- **Vite** - Fast build tool and development server
+- **TypeScript** - Type-safe development
+- **Viem** - Lightweight Ethereum library
+- **Rainbow Kit** - Beautiful wallet connection UI
+- **Wagmi** - React hooks for Ethereum
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Prerequisites
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js 18+ 
+- npm
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. Copy environment variables:
+```bash
+cp .env.example .env
 ```
+
+3. (Optional) Set up WalletConnect Project ID:
+   - Get a project ID from [WalletConnect Cloud](https://cloud.walletconnect.com)
+   - Update `VITE_WALLETCONNECT_PROJECT_ID` in `.env`
+
+### Development
+
+Start the development server:
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+### Building
+
+Build the application for production:
+```bash
+npm run build
+```
+
+Preview the production build:
+```bash
+npm run preview
+```
+
+## Usage
+
+### 1. Project Setup Tab
+- Configure contract addresses for GameCoin, ConfidentialToken, and SecretAirdrop
+- Wrap GameCoin tokens into ConfidentialToken
+- Deposit tokens to the airdrop contract
+- Configure recipients and their encrypted amounts
+
+### 2. Claim Airdrop Tab
+- Check airdrop eligibility
+- Claim available airdrops
+- View token balances
+
+### 3. Status Tab
+- View airdrop statistics
+- See recipient list and claim status
+
+## Contract Integration
+
+The app integrates with three main contracts:
+- **GameCoin**: ERC20 token for initial funding
+- **ConfidentialToken**: FHE-enabled wrapper token
+- **SecretAirdrop**: Main airdrop distribution contract
+
+## Security Features
+
+- All transaction amounts are encrypted using FHE
+- Only authorized users can view their specific airdrop amounts
+- Project owners have encrypted access to total statistics
+
+## License
+
+This project is licensed under the BSD-3-Clause-Clear license.
