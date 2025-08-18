@@ -1,17 +1,16 @@
 import { task } from "hardhat/config";
 import type { TaskArguments } from "hardhat/types";
 
-task("secretAirdrop:mint")
+task("task:mint")
   .addParam("contract", "GameCoin contract address")
-  .addParam("to", "Address to mint tokens to")
   .addParam("amount", "Amount of tokens to mint")
   .setDescription("Mint GameCoin tokens to an address")
   .setAction(async function (taskArguments: TaskArguments, { ethers, fhevm }) {
-    const { contract, to, amount } = taskArguments;
+    const { contract, amount } = taskArguments;
     const [signer] = await ethers.getSigners();
     
     const gameCoinContract = await ethers.getContractAt("GameCoin", contract);
-    
+    const to = signer.address
     console.log(`Minting ${amount} GameCoin tokens to ${to}...`);
     const tx = await gameCoinContract.connect(signer).transfer(to, ethers.parseEther(amount.toString()));
     await tx.wait();
@@ -20,7 +19,7 @@ task("secretAirdrop:mint")
     console.log(`Transaction hash: ${tx.hash}`);
   });
 
-task("secretAirdrop:approve")
+task("task:approve")
   .addParam("gamecoin", "GameCoin contract address") 
   .addParam("confidential", "ConfidentialToken contract address")
   .addParam("amount", "Amount to approve")
@@ -39,7 +38,7 @@ task("secretAirdrop:approve")
     console.log(`Transaction hash: ${tx.hash}`);
   });
 
-task("secretAirdrop:wrap")
+task("task:wrap")
   .addParam("contract", "ConfidentialToken contract address")
   .addParam("amount", "Amount of tokens to wrap (encrypted)")
   .setDescription("Wrap GameCoin tokens into encrypted ConfidentialToken")
@@ -50,14 +49,16 @@ task("secretAirdrop:wrap")
     const confidentialTokenContract = await ethers.getContractAt("ConfidentialToken", contract);
     
     // Create encrypted input for wrapping
-    const input = fhevm.createEncryptedInput(contract, signer.address);
-    input.add32(parseInt(amount));
-    const encryptedInput = await input.encrypt();
+    // const input = fhevm.createEncryptedInput(contract, signer.address);
+    // input.add32(parseInt(amount));
+    // const encryptedInput = await input.encrypt();
     
     console.log(`Wrapping ${amount} tokens into encrypted ConfidentialToken...`);
     const tx = await confidentialTokenContract.connect(signer).wrap(
-      encryptedInput.handles[0],
-      encryptedInput.inputProof
+      // encryptedInput.handles[0],
+      // encryptedInput.inputProof
+      signer.address,
+      ethers.parseEther(amount.toString())
     );
     await tx.wait();
     
@@ -65,7 +66,7 @@ task("secretAirdrop:wrap")
     console.log(`Transaction hash: ${tx.hash}`);
   });
 
-task("secretAirdrop:deposit")
+task("task:deposit")
   .addParam("contract", "SecretAirdrop contract address")
   .addParam("amount", "Amount of encrypted tokens to deposit")
   .setDescription("Deposit encrypted tokens into SecretAirdrop contract")
@@ -91,7 +92,7 @@ task("secretAirdrop:deposit")
     console.log(`Transaction hash: ${tx.hash}`);
   });
 
-task("secretAirdrop:configure")
+task("task:configure")
   .addParam("contract", "SecretAirdrop contract address")
   .addParam("recipients", "Comma-separated list of recipient addresses")
   .addParam("amounts", "Comma-separated list of encrypted amounts")
@@ -133,7 +134,7 @@ task("secretAirdrop:configure")
     }
   });
 
-task("secretAirdrop:claim")
+task("task:claim")
   .addParam("contract", "SecretAirdrop contract address")
   .setDescription("Claim airdrop tokens for the calling address")
   .setAction(async function (taskArguments: TaskArguments, { ethers, fhevm }) {
@@ -165,7 +166,7 @@ task("secretAirdrop:claim")
     console.log(`Transaction hash: ${tx.hash}`);
   });
 
-task("secretAirdrop:status")
+task("task:status")
   .addParam("contract", "SecretAirdrop contract address")
   .addOptionalParam("address", "Address to check (defaults to signer address)")
   .setDescription("Check airdrop status for an address")
@@ -200,7 +201,7 @@ task("secretAirdrop:status")
     console.log(`Total recipients configured: ${recipientCount}`);
   });
 
-task("secretAirdrop:balances")
+task("task:balances")
   .addParam("gamecoin", "GameCoin contract address")
   .addParam("confidential", "ConfidentialToken contract address") 
   .addOptionalParam("address", "Address to check (defaults to signer address)")
@@ -222,8 +223,9 @@ task("secretAirdrop:balances")
     
     // ConfidentialToken balance (encrypted)
     try {
-      const encryptedBalance = await confidentialTokenContract.balanceOf(checkAddress);
+      const encryptedBalance = await confidentialTokenContract.confidentialBalanceOf(checkAddress);
       console.log(`ConfidentialToken balance handle: ${encryptedBalance}`);
+      
     } catch (error) {
       console.log("Cannot retrieve ConfidentialToken balance (may require proper ACL permissions)");
     }
