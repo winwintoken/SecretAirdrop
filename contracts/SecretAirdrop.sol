@@ -66,6 +66,9 @@ contract SecretAirdrop is SepoliaConfig {
         ALREADY_CLAIMED = FHE.asEuint64(2);
         NO_AIRDROP = FHE.asEuint64(3);
         UNAUTHORIZED = FHE.asEuint64(4);
+
+        FHE.allowThis(totalDeposited);
+        FHE.allowThis(totalClaimed);
     }
 
     /**
