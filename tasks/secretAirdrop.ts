@@ -112,6 +112,7 @@ task("task:configure")
   .setDescription("Configure airdrops for multiple recipients")
   .setAction(async function (taskArguments: TaskArguments, { ethers, fhevm }) {
     const { contract, recipients, amounts } = taskArguments;
+    await fhevm.initializeCLIApi();
     const [signer] = await ethers.getSigners();
 
     const secretAirdropContract = await ethers.getContractAt("SecretAirdrop", contract);
@@ -126,7 +127,7 @@ task("task:configure")
     // Create encrypted inputs for all amounts
     const input = fhevm.createEncryptedInput(contract, signer.address);
     for (const amount of amountList) {
-      input.add32(amount);
+      input.add64(amount);
     }
     const encryptedInput = await input.encrypt();
 
@@ -149,10 +150,13 @@ task("task:configure")
 
 task("task:claim")
   .addParam("contract", "SecretAirdrop contract address")
+  .addParam("index", "address index")
   .setDescription("Claim airdrop tokens for the calling address")
   .setAction(async function (taskArguments: TaskArguments, { ethers, fhevm }) {
-    const { contract } = taskArguments;
-    const [signer] = await ethers.getSigners();
+    const { contract, index } = taskArguments;
+    await fhevm.initializeCLIApi();
+    const signers = await ethers.getSigners();
+    const signer = signers[index]
 
     const secretAirdropContract = await ethers.getContractAt("SecretAirdrop", contract);
 

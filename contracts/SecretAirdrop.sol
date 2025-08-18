@@ -57,8 +57,6 @@ contract SecretAirdrop is SepoliaConfig {
     constructor(address _confidentialToken) {
         confidentialToken = ConfidentialToken(_confidentialToken);
         projectOwner = msg.sender;
-        totalDeposited = FHE.asEuint64(0);
-        totalClaimed = FHE.asEuint64(0);
 
         // Initialize error codes
         NO_ERROR = FHE.asEuint64(0);
@@ -67,6 +65,8 @@ contract SecretAirdrop is SepoliaConfig {
         NO_AIRDROP = FHE.asEuint64(3);
         UNAUTHORIZED = FHE.asEuint64(4);
 
+        totalDeposited = FHE.asEuint64(0);
+        totalClaimed = FHE.asEuint64(0);
         FHE.allowThis(totalDeposited);
         FHE.allowThis(totalClaimed);
     }
@@ -133,46 +133,46 @@ contract SecretAirdrop is SepoliaConfig {
      */
     function claimAirdrop() external {
         AirdropInfo storage airdropInfo = airdrops[msg.sender];
-
+        console.log("claimAirdrop 1");
         // Check if airdrop exists
         if (!airdropInfo.exists) {
             _setError(msg.sender, NO_AIRDROP);
             return;
         }
-
+        console.log("claimAirdrop 2");
         // Check if already claimed
         if (airdropInfo.claimed) {
             _setError(msg.sender, ALREADY_CLAIMED);
             return;
         }
-
+        console.log("claimAirdrop 3");
         // Get the airdrop amount
         euint64 claimAmount = airdropInfo.amount;
 
         // Check if contract has sufficient balance (encrypted check)
-        euint64 remainingBalance = FHE.sub(totalDeposited, totalClaimed);
-        ebool canClaim = FHE.le(claimAmount, remainingBalance);
+        // euint64 remainingBalance = FHE.sub(totalDeposited, totalClaimed);
+        // ebool canClaim = FHE.le(claimAmount, remainingBalance);
 
         // Conditional transfer based on balance check
-        euint64 transferAmount = FHE.select(canClaim, claimAmount, FHE.asEuint64(0));
+        // euint64 transferAmount = FHE.select(canClaim, claimAmount, FHE.asEuint64(0));
 
         // Update state conditionally
-        euint64 errorCode = FHE.select(canClaim, NO_ERROR, INSUFFICIENT_BALANCE);
-        _setError(msg.sender, errorCode);
+        // euint64 errorCode = FHE.select(canClaim, NO_ERROR, INSUFFICIENT_BALANCE);
+        // _setError(msg.sender, errorCode);
 
         // Mark as claimed if successful
         airdropInfo.claimed = true;
-
+        console.log("claimAirdrop 4");
         // Update total claimed
-        totalClaimed = FHE.add(totalClaimed, transferAmount);
-
+        totalClaimed = FHE.add(totalClaimed, claimAmount);
+        console.log("claimAirdrop 5");
         // Transfer tokens to claimant
-        confidentialToken.confidentialTransfer(msg.sender, transferAmount);
-
+        FHE.allowTransient(claimAmount, address(confidentialToken));
+        confidentialToken.confidentialTransfer(msg.sender, claimAmount);
+        console.log("claimAirdrop 6");
         // Grant access permissions
         FHE.allowThis(totalClaimed);
-        FHE.allow(totalClaimed, msg.sender);
-
+        console.log("claimAirdrop 7");
         emit AirdropClaimed(msg.sender, block.timestamp);
     }
 
