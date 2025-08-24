@@ -5,9 +5,9 @@ import { GAME_COIN_ABI, CONFIDENTIAL_TOKEN_ABI, SECRET_AIRDROP_ABI } from '../..
 import { useFHEVM } from '../../hooks/useFHEVM';
 import { CONTRACT_ADDRESSES } from '../../config/contracts';
 
-interface SetupTabProps {}
+interface SetupTabProps { }
 
-export function SetupTab({}: SetupTabProps) {
+export function SetupTab({ }: SetupTabProps) {
   const [wrapAmount, setWrapAmount] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
   const [recipientData, setRecipientData] = useState('');
@@ -16,12 +16,12 @@ export function SetupTab({}: SetupTabProps) {
   const [wrapLoading, setWrapLoading] = useState(false);
   const [operatorLoading, setOperatorLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  
+
   // Track approval status
   const [isApproved, setIsApproved] = useState(false);
   const [approveHash, setApproveHash] = useState<string | null>(null);
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
-  
+
   // Track operator status
   const [isOperatorSet, setIsOperatorSet] = useState(false);
   const [operatorHash, setOperatorHash] = useState<string | null>(null);
@@ -30,6 +30,20 @@ export function SetupTab({}: SetupTabProps) {
   const { instance: fhevmInstance } = useFHEVM();
   const { writeContract, data: hash, error: writeError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({ hash });
+
+
+  // Convert Uint8Array handles to proper uint256 format
+  const convertHandle = (handle: any): `0x${string}` => {
+    let formattedHandle: string;
+    if (typeof handle === 'string') {
+      formattedHandle = handle.startsWith('0x') ? handle : `0x${handle}`;
+    } else if (handle instanceof Uint8Array) {
+      formattedHandle = `0x${Array.from(handle).map(b => b.toString(16).padStart(2, '0')).join('')}`;
+    } else {
+      formattedHandle = `0x${handle.toString()}`;
+    }
+    return formattedHandle as `0x${string}`
+  };
 
   // Check on-chain approval status
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
@@ -52,7 +66,7 @@ export function SetupTab({}: SetupTabProps) {
   // Calculate if approval is sufficient
   const requiredAmount = wrapAmount ? parseEther(parseInt(wrapAmount).toString()) : BigInt(0);
   const hasEnoughAllowance = currentAllowance ? currentAllowance >= requiredAmount : false;
-  
+
   // Use on-chain status as the source of truth
   const isReallyApproved = hasEnoughAllowance && !!wrapAmount;
   const isReallyOperatorSet = isOperatorStatus === true;
@@ -61,13 +75,13 @@ export function SetupTab({}: SetupTabProps) {
   React.useEffect(() => {
     if (hash) {
       console.log('📋 [TX] Transaction hash received:', hash);
-      
+
       // If we're currently approving, track this hash
       if (approveLoading) {
         console.log('📋 [APPROVE] Tracking approve transaction hash:', hash);
         setApproveHash(hash);
       }
-      
+
       // If we're currently setting operator, track this hash
       if (operatorLoading) {
         console.log('📋 [OPERATOR] Tracking setOperator transaction hash:', hash);
@@ -80,7 +94,7 @@ export function SetupTab({}: SetupTabProps) {
   React.useEffect(() => {
     if (isSuccess && hash) {
       console.log('✅ [TX] Transaction confirmed successfully! Hash:', hash);
-      
+
       // If this was an approve transaction, refetch the allowance
       if (approveHash && hash === approveHash) {
         console.log('✅ [APPROVE] Approve transaction confirmed, refetching allowance');
@@ -88,7 +102,7 @@ export function SetupTab({}: SetupTabProps) {
         // Refetch allowance data from chain
         setTimeout(() => refetchAllowance(), 1000); // Small delay to ensure chain state is updated
       }
-      
+
       // If this was a setOperator transaction, refetch the operator status
       if (operatorHash && hash === operatorHash) {
         console.log('✅ [OPERATOR] SetOperator transaction confirmed, refetching operator status');
@@ -179,7 +193,7 @@ export function SetupTab({}: SetupTabProps) {
     console.log('🚀 [APPROVE] Starting GameCoin approval process...');
     console.log('📊 [APPROVE] address:', address);
     console.log('📊 [APPROVE] wrapAmount:', wrapAmount);
-    
+
     if (!address || !wrapAmount) {
       console.error('❌ [APPROVE] Missing required parameters:', { address, wrapAmount });
       setMessage({ type: 'error', text: 'Please connect wallet and enter amount' });
@@ -191,14 +205,14 @@ export function SetupTab({}: SetupTabProps) {
       setIsWaitingForApproval(true);
       const amount = parseInt(wrapAmount);
       console.log('📊 [APPROVE] Parsed amount:', amount);
-      
+
       const approveAmount = parseEther(amount.toString());
       console.log('🔐 [APPROVE] Approving GameCoin for amount:', approveAmount.toString());
       console.log('🔐 [APPROVE] Contract addresses:', {
         gameCoin: CONTRACT_ADDRESSES.gameCoin,
         confidentialToken: CONTRACT_ADDRESSES.confidentialToken
       });
-      
+
       const approveArgs = {
         address: CONTRACT_ADDRESSES.gameCoin as `0x${string}`,
         abi: GAME_COIN_ABI,
@@ -206,7 +220,7 @@ export function SetupTab({}: SetupTabProps) {
         args: [CONTRACT_ADDRESSES.confidentialToken as `0x${string}`, approveAmount] as const,
       };
       console.log('🔐 [APPROVE] WriteContract args:', approveArgs);
-      
+
       const approveTx = writeContract(approveArgs);
       console.log('✅ [APPROVE] Approve transaction initiated:', approveTx);
 
@@ -231,7 +245,7 @@ export function SetupTab({}: SetupTabProps) {
     console.log('🚀 [WRAP] Starting wrap to confidential process...');
     console.log('📊 [WRAP] address:', address);
     console.log('📊 [WRAP] wrapAmount:', wrapAmount);
-    
+
     if (!address || !wrapAmount) {
       console.error('❌ [WRAP] Missing required parameters:', { address, wrapAmount });
       setMessage({ type: 'error', text: 'Please connect wallet and enter amount' });
@@ -247,7 +261,7 @@ export function SetupTab({}: SetupTabProps) {
       setWrapLoading(true);
       const amount = parseInt(wrapAmount);
       console.log('📊 [WRAP] Parsed amount:', amount);
-      
+
       // Convert amount to wei for the wrap function
       const amountInWei = parseEther(amount.toString());
       console.log('💰 [WRAP] Amount in wei:', amountInWei.toString());
@@ -285,7 +299,7 @@ export function SetupTab({}: SetupTabProps) {
   const setOperator = async () => {
     console.log('🚀 [OPERATOR] Starting setOperator process...');
     console.log('📊 [OPERATOR] address:', address);
-    
+
     if (!address) {
       console.error('❌ [OPERATOR] Missing required parameters:', { address });
       setMessage({ type: 'error', text: 'Please connect wallet' });
@@ -294,7 +308,7 @@ export function SetupTab({}: SetupTabProps) {
 
     try {
       setOperatorLoading(true);
-      
+
       console.log('🔐 [OPERATOR] Setting SecretAirdrop as operator...');
       // Set operator for 1 year from now (uint48 timestamp)
       const oneYearFromNow = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60);
@@ -321,7 +335,7 @@ export function SetupTab({}: SetupTabProps) {
     console.log('📊 [DEPOSIT] fhevmInstance:', fhevmInstance);
     console.log('📊 [DEPOSIT] address:', address);
     console.log('📊 [DEPOSIT] depositAmount:', depositAmount);
-    
+
     if (!fhevmInstance || !address || !depositAmount) {
       console.error('❌ [DEPOSIT] Missing required parameters:', { fhevmInstance, address, depositAmount });
       setMessage({ type: 'error', text: 'Please connect wallet and enter amount' });
@@ -341,10 +355,10 @@ export function SetupTab({}: SetupTabProps) {
       if (amount <= 0) {
         throw new Error('Amount must be greater than 0');
       }
-      
+
       console.log('📦 [DEPOSIT] Creating encrypted deposit input...');
       const depositInput = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.secretAirdrop, address);
-      depositInput.add32(amount);
+      depositInput.add64(amount * 1000000);
       console.log('🔒 [DEPOSIT] Encrypting deposit input...');
       const depositEncryptedInput = await depositInput.encrypt();
       console.log('✅ [DEPOSIT] Deposit encrypted input created:', {
@@ -357,7 +371,7 @@ export function SetupTab({}: SetupTabProps) {
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'depositTokens',
-        args: [depositEncryptedInput.handles[0], depositEncryptedInput.inputProof],
+        args: [convertHandle(depositEncryptedInput.handles[0]), convertHandle(depositEncryptedInput.inputProof)],
       });
       console.log('✅ [DEPOSIT] Deposit transaction initiated');
 
@@ -383,7 +397,7 @@ export function SetupTab({}: SetupTabProps) {
     console.log('📊 [CONFIGURE] fhevmInstance:', fhevmInstance);
     console.log('📊 [CONFIGURE] address:', address);
     console.log('📊 [CONFIGURE] recipientData:', recipientData);
-    
+
     if (!fhevmInstance || !address || !recipientData) {
       console.error('❌ [CONFIGURE] Missing required parameters:', { fhevmInstance, address, recipientData });
       setMessage({ type: 'error', text: 'Please connect wallet and enter recipient data' });
@@ -392,7 +406,7 @@ export function SetupTab({}: SetupTabProps) {
 
     try {
       setIsLoading(true);
-      
+
       console.log('📋 [CONFIGURE] Parsing recipient data...');
       const lines = recipientData.split('\n').filter(line => line.trim());
       const recipients: string[] = [];
@@ -418,7 +432,7 @@ export function SetupTab({}: SetupTabProps) {
         recipients.push(recipientAddress);
         amounts.push(amount);
       }
-      
+
       console.log('✅ [CONFIGURE] Parsed recipients and amounts:', {
         recipients: recipients,
         amounts: amounts,
@@ -432,7 +446,7 @@ export function SetupTab({}: SetupTabProps) {
         console.log(`🔒 [CONFIGURE] Adding amount ${amount} for recipient ${index}: ${recipients[index]}`);
         input.add32(amount);
       });
-      
+
       console.log('🔒 [CONFIGURE] Encrypting inputs...');
       const encryptedInput = await input.encrypt();
       console.log('✅ [CONFIGURE] Encrypted inputs created:', {
@@ -483,35 +497,35 @@ export function SetupTab({}: SetupTabProps) {
             />
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button 
-              style={{ 
-                ...buttonStyle, 
+            <button
+              style={{
+                ...buttonStyle,
                 background: isReallyApproved ? '#95a5a6' : (approveHash && !isReallyApproved) ? '#f39c12' : '#3498db',
-                opacity: isReallyApproved ? 0.7 : 1 
-              }} 
+                opacity: isReallyApproved ? 0.7 : 1
+              }}
               onClick={approveGameCoin}
               disabled={approveLoading || isConfirming || isReallyApproved}
             >
-              {approveLoading 
-                ? 'Sending...' 
-                : isConfirming && approveHash 
-                ? 'Confirming...' 
-                : isReallyApproved 
-                ? '✅ Approved' 
-                : '1. Approve GameCoin'
+              {approveLoading
+                ? 'Sending...'
+                : isConfirming && approveHash
+                  ? 'Confirming...'
+                  : isReallyApproved
+                    ? '✅ Approved'
+                    : '1. Approve GameCoin'
               }
             </button>
-            <button 
-              style={{ 
-                ...buttonStyle, 
+            <button
+              style={{
+                ...buttonStyle,
                 background: isReallyApproved ? '#27ae60' : '#bdc3c7',
                 cursor: isReallyApproved ? 'pointer' : 'not-allowed'
-              }} 
+              }}
               onClick={wrapToConfidential}
               disabled={wrapLoading || isConfirming || !isReallyApproved}
             >
-              {wrapLoading || isConfirming 
-                ? 'Wrapping...' 
+              {wrapLoading || isConfirming
+                ? 'Wrapping...'
                 : '2. Wrap to Confidential'
               }
             </button>
@@ -541,28 +555,28 @@ export function SetupTab({}: SetupTabProps) {
               ✅ GameCoin approved! Current allowance: {currentAllowance ? formatEther(currentAllowance) : '0'} tokens. You can now wrap to ConfidentialToken.
             </div>
           )}
-          
+
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
-            <button 
-              style={{ 
-                ...buttonStyle, 
+            <button
+              style={{
+                ...buttonStyle,
                 background: isReallyOperatorSet ? '#95a5a6' : (operatorHash && !isReallyOperatorSet) ? '#f39c12' : '#e67e22',
-                opacity: isReallyOperatorSet ? 0.7 : 1 
-              }} 
+                opacity: isReallyOperatorSet ? 0.7 : 1
+              }}
               onClick={setOperator}
               disabled={operatorLoading || isConfirming || isReallyOperatorSet}
             >
-              {operatorLoading 
-                ? 'Sending...' 
-                : isConfirming && operatorHash 
-                ? 'Confirming...' 
-                : isReallyOperatorSet 
-                ? '✅ Operator Set' 
-                : 'Set Operator'
+              {operatorLoading
+                ? 'Sending...'
+                : isConfirming && operatorHash
+                  ? 'Confirming...'
+                  : isReallyOperatorSet
+                    ? '✅ Operator Set'
+                    : 'Set Operator'
               }
             </button>
           </div>
-          
+
           {/* Status messages for operator */}
           {operatorHash && !isReallyOperatorSet && (
             <div style={{
@@ -588,7 +602,7 @@ export function SetupTab({}: SetupTabProps) {
               ✅ SecretAirdrop is set as operator! You can now deposit tokens.
             </div>
           )}
-          
+
           <div style={formGroupStyle}>
             <label style={labelStyle}>Amount to Deposit (for Airdrop):</label>
             <input
@@ -599,12 +613,12 @@ export function SetupTab({}: SetupTabProps) {
               placeholder="5000"
             />
           </div>
-          <button 
-            style={{ 
-              ...buttonStyle, 
+          <button
+            style={{
+              ...buttonStyle,
               background: isReallyOperatorSet ? '#27ae60' : '#bdc3c7',
               cursor: isReallyOperatorSet ? 'pointer' : 'not-allowed'
-            }} 
+            }}
             onClick={depositTokens}
             disabled={isLoading || isConfirming || !isReallyOperatorSet}
           >
@@ -624,8 +638,8 @@ export function SetupTab({}: SetupTabProps) {
             placeholder="0x1234...,1000&#10;0x5678...,2000&#10;0x9abc...,1500"
           />
         </div>
-        <button 
-          style={{ ...buttonStyle, background: '#f39c12' }} 
+        <button
+          style={{ ...buttonStyle, background: '#f39c12' }}
           onClick={configureAirdrops}
           disabled={isLoading || isConfirming}
         >

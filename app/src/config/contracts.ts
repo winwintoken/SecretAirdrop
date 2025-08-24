@@ -5,7 +5,7 @@ export const CONTRACT_ADDRESSES = {
   // These are placeholder addresses - replace with actual deployed contract addresses
   gameCoin: import.meta.env.VITE_GAME_COIN_ADDRESS || "0x9B1409B81E9DA3555a694aA5Ba2B15506a583D4A",
   confidentialToken: import.meta.env.VITE_CONFIDENTIAL_TOKEN_ADDRESS || "0x7dd22ca0e18246C3CB078a52D566f34Fc147eb4d",
-  secretAirdrop: import.meta.env.VITE_SECRET_AIRDROP_ADDRESS || "0x88B4b7762258B9cF24E9536bd1a6d90B91C5062A"
+  secretAirdrop: import.meta.env.VITE_SECRET_AIRDROP_ADDRESS || "0xf1bdF668605681Ff21FE452311Dfb8F66Da11f3C"
 } as const;
 
 // Log contract addresses on initialization
