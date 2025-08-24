@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther } from 'viem';
-import { GAME_COIN_ABI, SECRET_AIRDROP_ABI } from '../../types/contracts';
+import { GAME_COIN_ABI, SECRET_AIRDROP_ABI, CONFIDENTIAL_TOKEN_ABI } from '../../types/contracts';
 import { CONTRACT_ADDRESSES } from '../../config/contracts';
+import { EncryptedBalance } from '../EncryptedBalance';
 
-interface ClaimTabProps {}
+interface ClaimTabProps { }
 
-export function ClaimTab({}: ClaimTabProps) {
+export function ClaimTab({ }: ClaimTabProps) {
   const [gameCoinBalance, setGameCoinBalance] = useState<string>('0');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -33,6 +34,13 @@ export function ClaimTab({}: ClaimTabProps) {
     address: CONTRACT_ADDRESSES.gameCoin as `0x${string}`,
     abi: GAME_COIN_ABI,
     functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+  });
+
+  const { data: confidentialBalance } = useReadContract({
+    address: CONTRACT_ADDRESSES.confidentialToken as `0x${string}`,
+    abi: CONFIDENTIAL_TOKEN_ABI,
+    functionName: 'confidentialBalanceOf',
     args: address ? [address] : undefined,
   });
 
@@ -77,7 +85,7 @@ export function ClaimTab({}: ClaimTabProps) {
     console.log('📊 [CLAIM] address:', address);
     console.log('📊 [CLAIM] hasAirdrop:', hasAirdrop);
     console.log('📊 [CLAIM] hasClaimed:', hasClaimed);
-    
+
     if (!address) {
       console.error('❌ [CLAIM] No wallet address');
       setMessage({ type: 'error', text: 'Please connect your wallet' });
@@ -123,7 +131,7 @@ export function ClaimTab({}: ClaimTabProps) {
       setMessage({ type: 'error', text: 'Please connect your wallet' });
       return;
     }
-    
+
     // Status is automatically updated via useReadContract hooks
     setMessage({ type: 'success', text: 'Status refreshed' });
     setTimeout(() => setMessage(null), 2000);
@@ -161,15 +169,15 @@ export function ClaimTab({}: ClaimTabProps) {
         <div style={infoCardStyle}>
           {getAirdropStatusDisplay()}
         </div>
-        <button 
-          style={{ ...buttonStyle, background: '#27ae60' }} 
+        <button
+          style={{ ...buttonStyle, background: '#27ae60' }}
           onClick={claimAirdrop}
           disabled={isConfirming || !hasAirdrop || !!hasClaimed}
         >
           {isConfirming ? 'Processing...' : 'Claim My Airdrop'}
         </button>
-        <button 
-          style={{ ...buttonStyle, background: '#95a5a6' }} 
+        <button
+          style={{ ...buttonStyle, background: '#95a5a6' }}
           onClick={checkAirdropStatus}
         >
           Check Status
@@ -180,10 +188,16 @@ export function ClaimTab({}: ClaimTabProps) {
         <h3 style={{ margin: '0 0 15px 0', color: '#2c3e50', fontSize: '1.3em' }}>💰 Your Balances</h3>
         <div style={infoCardStyle}>
           <p><strong>GameCoin Balance:</strong> {gameCoinBalance} GAME</p>
-          <p><strong>ConfidentialToken Balance:</strong> Encrypted (use user decrypt to view)</p>
+          <p>
+            <EncryptedBalance
+              ciphertextHandle={confidentialBalance as string | null}
+              label="ConfidentialToken Balance"
+              unit="cGmaeCoin"
+            />
+          </p>
         </div>
-        <button 
-          style={{ ...buttonStyle, background: '#95a5a6' }} 
+        <button
+          style={{ ...buttonStyle, background: '#95a5a6' }}
           onClick={() => window.location.reload()}
         >
           Refresh Balances
