@@ -14,12 +14,17 @@ export function SetupTab({}: SetupTabProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [approveLoading, setApproveLoading] = useState(false);
   const [wrapLoading, setWrapLoading] = useState(false);
+  const [operatorLoading, setOperatorLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
   // Track approval status
   const [isApproved, setIsApproved] = useState(false);
   const [approveHash, setApproveHash] = useState<string | null>(null);
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
+  
+  // Track operator status
+  const [isOperatorSet, setIsOperatorSet] = useState(false);
+  const [operatorHash, setOperatorHash] = useState<string | null>(null);
 
   const { address } = useAccount();
   const { instance: fhevmInstance } = useFHEVM();
@@ -35,12 +40,22 @@ export function SetupTab({}: SetupTabProps) {
     enabled: !!address && !!wrapAmount,
   });
 
+  // Check if SecretAirdrop is set as operator for ConfidentialToken
+  const { data: isOperatorStatus, refetch: refetchOperatorStatus } = useReadContract({
+    address: CONTRACT_ADDRESSES.confidentialToken as `0x${string}`,
+    abi: CONFIDENTIAL_TOKEN_ABI,
+    functionName: 'isOperator',
+    args: [address as `0x${string}`, CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`],
+    enabled: !!address,
+  });
+
   // Calculate if approval is sufficient
   const requiredAmount = wrapAmount ? parseEther(parseInt(wrapAmount).toString()) : BigInt(0);
   const hasEnoughAllowance = currentAllowance ? currentAllowance >= requiredAmount : false;
   
   // Use on-chain status as the source of truth
   const isReallyApproved = hasEnoughAllowance && !!wrapAmount;
+  const isReallyOperatorSet = isOperatorStatus === true;
 
   // Log transaction status changes
   React.useEffect(() => {
@@ -52,10 +67,16 @@ export function SetupTab({}: SetupTabProps) {
         console.log('📋 [APPROVE] Tracking approve transaction hash:', hash);
         setApproveHash(hash);
       }
+      
+      // If we're currently setting operator, track this hash
+      if (operatorLoading) {
+        console.log('📋 [OPERATOR] Tracking setOperator transaction hash:', hash);
+        setOperatorHash(hash);
+      }
     }
-  }, [hash, approveLoading]);
+  }, [hash, approveLoading, operatorLoading]);
 
-  // Simplified effect to track transaction confirmations and refetch allowance
+  // Simplified effect to track transaction confirmations and refetch data
   React.useEffect(() => {
     if (isSuccess && hash) {
       console.log('✅ [TX] Transaction confirmed successfully! Hash:', hash);
@@ -67,8 +88,15 @@ export function SetupTab({}: SetupTabProps) {
         // Refetch allowance data from chain
         setTimeout(() => refetchAllowance(), 1000); // Small delay to ensure chain state is updated
       }
+      
+      // If this was a setOperator transaction, refetch the operator status
+      if (operatorHash && hash === operatorHash) {
+        console.log('✅ [OPERATOR] SetOperator transaction confirmed, refetching operator status');
+        // Refetch operator status from chain
+        setTimeout(() => refetchOperatorStatus(), 1000);
+      }
     }
-  }, [isSuccess, hash, approveHash, refetchAllowance]);
+  }, [isSuccess, hash, approveHash, operatorHash, refetchAllowance, refetchOperatorStatus]);
 
   React.useEffect(() => {
     if (writeError) {
@@ -253,6 +281,41 @@ export function SetupTab({}: SetupTabProps) {
     }
   };
 
+  // Step 1: Set SecretAirdrop as operator for ConfidentialToken
+  const setOperator = async () => {
+    console.log('🚀 [OPERATOR] Starting setOperator process...');
+    console.log('📊 [OPERATOR] address:', address);
+    
+    if (!address) {
+      console.error('❌ [OPERATOR] Missing required parameters:', { address });
+      setMessage({ type: 'error', text: 'Please connect wallet' });
+      return;
+    }
+
+    try {
+      setOperatorLoading(true);
+      
+      console.log('🔐 [OPERATOR] Setting SecretAirdrop as operator...');
+      // Set operator for 1 year from now (uint48 timestamp)
+      const oneYearFromNow = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60);
+      const setOperatorTx = writeContract({
+        address: CONTRACT_ADDRESSES.confidentialToken as `0x${string}`,
+        abi: CONFIDENTIAL_TOKEN_ABI,
+        functionName: 'setOperator',
+        args: [CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`, oneYearFromNow],
+      });
+      console.log('✅ [OPERATOR] SetOperator transaction initiated:', setOperatorTx);
+
+      setMessage({ type: 'success', text: 'SetOperator transaction initiated! Please wait for confirmation.' });
+    } catch (error) {
+      console.error('❌ [OPERATOR] Error during setOperator process:', error);
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to set operator' });
+    } finally {
+      setOperatorLoading(false);
+      console.log('🏁 [OPERATOR] SetOperator process finished');
+    }
+  };
+
   const depositTokens = async () => {
     console.log('🚀 [DEPOSIT] Starting deposit process...');
     console.log('📊 [DEPOSIT] fhevmInstance:', fhevmInstance);
@@ -265,33 +328,21 @@ export function SetupTab({}: SetupTabProps) {
       return;
     }
 
+    if (!isReallyOperatorSet) {
+      setMessage({ type: 'error', text: 'Please set SecretAirdrop as operator first' });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const amount = parseInt(depositAmount);
       console.log('📊 [DEPOSIT] Parsed amount:', amount);
 
-      // Step 1: Approve ConfidentialToken
-      console.log('🔐 [DEPOSIT] Step 1: Creating encrypted approve input...');
-      const approveInput = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.confidentialToken, address);
-      approveInput.add32(amount);
-      console.log('🔒 [DEPOSIT] Encrypting approve input...');
-      const approveEncryptedInput = await approveInput.encrypt();
-      console.log('✅ [DEPOSIT] Approve encrypted input created:', {
-        handles: approveEncryptedInput.handles,
-        inputProof: approveEncryptedInput.inputProof
-      });
-
-      console.log('🔐 [DEPOSIT] Calling ConfidentialToken approve...');
-      const approveTx = await writeContract({
-        address: CONTRACT_ADDRESSES.confidentialToken as `0x${string}`,
-        abi: CONFIDENTIAL_TOKEN_ABI,
-        functionName: 'approve',
-        args: [CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`, approveEncryptedInput.handles[0], approveEncryptedInput.inputProof],
-      });
-      console.log('✅ [DEPOSIT] Approve transaction initiated:', approveTx);
-
-      // Step 2: Deposit tokens
-      console.log('📦 [DEPOSIT] Step 2: Creating encrypted deposit input...');
+      if (amount <= 0) {
+        throw new Error('Amount must be greater than 0');
+      }
+      
+      console.log('📦 [DEPOSIT] Creating encrypted deposit input...');
       const depositInput = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.secretAirdrop, address);
       depositInput.add32(amount);
       console.log('🔒 [DEPOSIT] Encrypting deposit input...');
@@ -302,13 +353,13 @@ export function SetupTab({}: SetupTabProps) {
       });
 
       console.log('📦 [DEPOSIT] Calling SecretAirdrop depositTokens...');
-      const depositTx = await writeContract({
+      writeContract({
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'depositTokens',
         args: [depositEncryptedInput.handles[0], depositEncryptedInput.inputProof],
       });
-      console.log('✅ [DEPOSIT] Deposit transaction initiated:', depositTx);
+      console.log('✅ [DEPOSIT] Deposit transaction initiated');
 
       console.log('🎉 [DEPOSIT] Process completed successfully!');
       setMessage({ type: 'success', text: `Successfully deposited ${amount} tokens to airdrop contract!` });
@@ -391,13 +442,13 @@ export function SetupTab({}: SetupTabProps) {
       });
 
       console.log('📦 [CONFIGURE] Calling SecretAirdrop configureAirdrops...');
-      const configureTx = await writeContract({
+      writeContract({
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'configureAirdrops',
         args: [recipients as `0x${string}`[], encryptedInput.handles, encryptedInput.inputProof],
       });
-      console.log('✅ [CONFIGURE] Configure transaction initiated:', configureTx);
+      console.log('✅ [CONFIGURE] Configure transaction initiated');
 
       console.log('🎉 [CONFIGURE] Process completed successfully!');
       setMessage({ type: 'success', text: `Successfully configured airdrops for ${recipients.length} recipients!` });
@@ -491,6 +542,53 @@ export function SetupTab({}: SetupTabProps) {
             </div>
           )}
           
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+            <button 
+              style={{ 
+                ...buttonStyle, 
+                background: isReallyOperatorSet ? '#95a5a6' : (operatorHash && !isReallyOperatorSet) ? '#f39c12' : '#e67e22',
+                opacity: isReallyOperatorSet ? 0.7 : 1 
+              }} 
+              onClick={setOperator}
+              disabled={operatorLoading || isConfirming || isReallyOperatorSet}
+            >
+              {operatorLoading 
+                ? 'Sending...' 
+                : isConfirming && operatorHash 
+                ? 'Confirming...' 
+                : isReallyOperatorSet 
+                ? '✅ Operator Set' 
+                : 'Set Operator'
+              }
+            </button>
+          </div>
+          
+          {/* Status messages for operator */}
+          {operatorHash && !isReallyOperatorSet && (
+            <div style={{
+              background: '#fff3cd',
+              color: '#856404',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              marginBottom: '10px'
+            }}>
+              ⏳ Operator transaction sent! Waiting for confirmation...
+            </div>
+          )}
+          {isReallyOperatorSet && (
+            <div style={{
+              background: '#e8f5e8',
+              color: '#27ae60',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              marginBottom: '10px'
+            }}>
+              ✅ SecretAirdrop is set as operator! You can now deposit tokens.
+            </div>
+          )}
+          
           <div style={formGroupStyle}>
             <label style={labelStyle}>Amount to Deposit (for Airdrop):</label>
             <input
@@ -502,9 +600,13 @@ export function SetupTab({}: SetupTabProps) {
             />
           </div>
           <button 
-            style={{ ...buttonStyle, background: '#27ae60' }} 
+            style={{ 
+              ...buttonStyle, 
+              background: isReallyOperatorSet ? '#27ae60' : '#bdc3c7',
+              cursor: isReallyOperatorSet ? 'pointer' : 'not-allowed'
+            }} 
             onClick={depositTokens}
-            disabled={isLoading || isConfirming}
+            disabled={isLoading || isConfirming || !isReallyOperatorSet}
           >
             {isLoading || isConfirming ? 'Processing...' : 'Deposit to Airdrop'}
           </button>
