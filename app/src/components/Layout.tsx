@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useChainId } from 'wagmi';
 
@@ -7,19 +7,52 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  // const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const chainId = useChainId();
 
+  // Log wallet connection status
+  useEffect(() => {
+    console.log('🔗 [WALLET] Connection status changed:', {
+      isConnected,
+      address,
+      chainId,
+      connector: connector?.name
+    });
+  }, [isConnected, address, chainId, connector]);
+
+  useEffect(() => {
+    if (isConnected && address) {
+      console.log('✅ [WALLET] Wallet connected successfully!');
+      console.log('📊 [WALLET] Address:', address);
+      console.log('📊 [WALLET] Chain ID:', chainId);
+      console.log('📊 [WALLET] Network:', getNetworkName(chainId));
+    } else {
+      console.log('❌ [WALLET] Wallet not connected');
+    }
+  }, [isConnected, address, chainId]);
+
   const getNetworkName = (chainId: number) => {
+    console.log('🌐 [NETWORK] Checking network for chainId:', chainId);
     switch (chainId) {
       case 11155111:
+        console.log('✅ [NETWORK] Connected to Sepolia testnet');
         return 'Sepolia';
       case 1:
+        console.log('✅ [NETWORK] Connected to Ethereum mainnet');
         return 'Ethereum';
       default:
+        console.warn('⚠️ [NETWORK] Unknown network with chainId:', chainId);
         return 'Unknown';
     }
   };
+
+  // Validate network for FHEVM compatibility
+  useEffect(() => {
+    if (chainId !== 11155111) {
+      console.warn('⚠️ [NETWORK] Not on Sepolia testnet! FHEVM contracts may not work correctly.');
+      console.warn('⚠️ [NETWORK] Please switch to Sepolia (chainId: 11155111)');
+    }
+  }, [chainId]);
 
   return (
     <div style={{ 

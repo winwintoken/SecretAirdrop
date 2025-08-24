@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, isAddress } from 'viem';
 import { GAME_COIN_ABI, CONFIDENTIAL_TOKEN_ABI, SECRET_AIRDROP_ABI } from '../../types/contracts';
@@ -12,12 +12,78 @@ export function SetupTab({}: SetupTabProps) {
   const [depositAmount, setDepositAmount] = useState('');
   const [recipientData, setRecipientData] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [wrapLoading, setWrapLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Track approval status
+  const [isApproved, setIsApproved] = useState(false);
+  const [approveHash, setApproveHash] = useState<string | null>(null);
 
   const { address } = useAccount();
   const { instance: fhevmInstance } = useFHEVM();
-  const { writeContract, data: hash } = useWriteContract();
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash });
+  const { writeContract, data: hash, error: writeError } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess, error: receiptError } = useWaitForTransactionReceipt({ hash });
+
+  // Log transaction status changes
+  React.useEffect(() => {
+    if (hash) {
+      console.log('📋 [TX] Transaction hash received:', hash);
+      
+      // If we're currently approving, track this hash
+      if (approveLoading) {
+        console.log('📋 [APPROVE] Tracking approve transaction hash:', hash);
+        setApproveHash(hash);
+      }
+    }
+  }, [hash, approveLoading]);
+
+  React.useEffect(() => {
+    if (isConfirming) {
+      console.log('⌛ [TX] Waiting for transaction confirmation...');
+    }
+  }, [isConfirming]);
+
+  React.useEffect(() => {
+    if (isSuccess && hash) {
+      console.log('✅ [TX] Transaction confirmed successfully! Hash:', hash);
+      
+      // Check if this is an approve transaction that just completed
+      if (approveHash && hash === approveHash) {
+        console.log('✅ [APPROVE] Approve transaction confirmed, enabling wrap button');
+        setIsApproved(true);
+        setApproveHash(null);
+      }
+    }
+  }, [isSuccess, hash, approveHash]);
+
+  React.useEffect(() => {
+    if (writeError) {
+      console.error('❌ [TX] Write contract error:', writeError);
+    }
+  }, [writeError]);
+
+  React.useEffect(() => {
+    if (receiptError) {
+      console.error('❌ [TX] Transaction receipt error:', receiptError);
+    }
+  }, [receiptError]);
+
+  // Reset approval state when amount changes
+  React.useEffect(() => {
+    if (wrapAmount !== '' && isApproved) {
+      console.log('🔄 [STATE] Amount changed, resetting approval status');
+      setIsApproved(false);
+    }
+  }, [wrapAmount, isApproved]);
+
+  // Reset approval state when wallet disconnects
+  React.useEffect(() => {
+    if (!address && isApproved) {
+      console.log('🔄 [STATE] Wallet disconnected, resetting approval status');
+      setIsApproved(false);
+    }
+  }, [address, isApproved]);
 
   const cardStyle = {
     background: 'white',
@@ -62,48 +128,125 @@ export function SetupTab({}: SetupTabProps) {
   };
 
 
-  const approveAndWrap = async () => {
-    if (!fhevmInstance || !address || !wrapAmount) {
+  // Step 1: Approve GameCoin for ConfidentialToken
+  const approveGameCoin = async () => {
+    console.log('🚀 [APPROVE] Starting GameCoin approval process...');
+    console.log('📊 [APPROVE] address:', address);
+    console.log('📊 [APPROVE] wrapAmount:', wrapAmount);
+    
+    if (!address || !wrapAmount) {
+      console.error('❌ [APPROVE] Missing required parameters:', { address, wrapAmount });
       setMessage({ type: 'error', text: 'Please connect wallet and enter amount' });
       return;
     }
 
     try {
-      setIsLoading(true);
+      setApproveLoading(true);
       const amount = parseInt(wrapAmount);
+      console.log('📊 [APPROVE] Parsed amount:', amount);
       
-      // Step 1: Approve GameCoin
       const approveAmount = parseEther(amount.toString());
-      await writeContract({
+      console.log('🔐 [APPROVE] Approving GameCoin for amount:', approveAmount.toString());
+      console.log('🔐 [APPROVE] Contract addresses:', {
+        gameCoin: CONTRACT_ADDRESSES.gameCoin,
+        confidentialToken: CONTRACT_ADDRESSES.confidentialToken
+      });
+      
+      const approveArgs = {
         address: CONTRACT_ADDRESSES.gameCoin as `0x${string}`,
         abi: GAME_COIN_ABI,
-        functionName: 'approve',
-        args: [CONTRACT_ADDRESSES.confidentialToken as `0x${string}`, approveAmount],
-      });
+        functionName: 'approve' as const,
+        args: [CONTRACT_ADDRESSES.confidentialToken as `0x${string}`, approveAmount] as const,
+      };
+      console.log('🔐 [APPROVE] WriteContract args:', approveArgs);
+      
+      const approveTx = writeContract(approveArgs);
+      console.log('✅ [APPROVE] Approve transaction initiated:', approveTx);
 
-      // Step 2: Create encrypted input and wrap
+      setMessage({ type: 'success', text: `GameCoin approval initiated for ${amount} tokens! Please wait for confirmation.` });
+    } catch (error) {
+      console.error('❌ [APPROVE] Error during approval process:', error);
+      console.error('❌ [APPROVE] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? error.cause : undefined
+      });
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to approve GameCoin' });
+    } finally {
+      setApproveLoading(false);
+      console.log('🏁 [APPROVE] Approval process finished');
+    }
+  };
+
+  // Step 2: Wrap GameCoin to ConfidentialToken
+  const wrapToConfidential = async () => {
+    console.log('🚀 [WRAP] Starting wrap to confidential process...');
+    console.log('📊 [WRAP] fhevmInstance:', fhevmInstance);
+    console.log('📊 [WRAP] address:', address);
+    console.log('📊 [WRAP] wrapAmount:', wrapAmount);
+    
+    if (!fhevmInstance || !address || !wrapAmount) {
+      console.error('❌ [WRAP] Missing required parameters:', { fhevmInstance, address, wrapAmount });
+      setMessage({ type: 'error', text: 'Please connect wallet and enter amount' });
+      return;
+    }
+
+    if (!isApproved) {
+      setMessage({ type: 'error', text: 'Please approve GameCoin first' });
+      return;
+    }
+
+    try {
+      setWrapLoading(true);
+      const amount = parseInt(wrapAmount);
+      console.log('📊 [WRAP] Parsed amount:', amount);
+      
+      // Create encrypted input and wrap
+      console.log('🔒 [WRAP] Creating encrypted input...');
       const input = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.confidentialToken, address);
       input.add32(amount);
+      console.log('🔒 [WRAP] Encrypting input...');
       const encryptedInput = await input.encrypt();
+      console.log('✅ [WRAP] Encrypted input created:', {
+        handles: encryptedInput.handles,
+        inputProof: encryptedInput.inputProof
+      });
 
-      await writeContract({
+      console.log('📦 [WRAP] Calling wrap function...');
+      const wrapTx = writeContract({
         address: CONTRACT_ADDRESSES.confidentialToken as `0x${string}`,
         abi: CONFIDENTIAL_TOKEN_ABI,
         functionName: 'wrap',
         args: [encryptedInput.handles[0], encryptedInput.inputProof],
       });
+      console.log('✅ [WRAP] Wrap transaction initiated:', wrapTx);
 
-      setMessage({ type: 'success', text: `Successfully wrapped ${amount} GameCoin tokens!` });
+      console.log('🎉 [WRAP] Wrap process completed successfully!');
+      setMessage({ type: 'success', text: `Successfully wrapped ${amount} GameCoin to ConfidentialToken!` });
       setWrapAmount('');
+      setIsApproved(false); // Reset approval state
     } catch (error) {
+      console.error('❌ [WRAP] Error during wrap process:', error);
+      console.error('❌ [WRAP] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? error.cause : undefined
+      });
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to wrap tokens' });
     } finally {
-      setIsLoading(false);
+      setWrapLoading(false);
+      console.log('🏁 [WRAP] Wrap process finished');
     }
   };
 
   const depositTokens = async () => {
+    console.log('🚀 [DEPOSIT] Starting deposit process...');
+    console.log('📊 [DEPOSIT] fhevmInstance:', fhevmInstance);
+    console.log('📊 [DEPOSIT] address:', address);
+    console.log('📊 [DEPOSIT] depositAmount:', depositAmount);
+    
     if (!fhevmInstance || !address || !depositAmount) {
+      console.error('❌ [DEPOSIT] Missing required parameters:', { fhevmInstance, address, depositAmount });
       setMessage({ type: 'error', text: 'Please connect wallet and enter amount' });
       return;
     }
@@ -111,42 +254,73 @@ export function SetupTab({}: SetupTabProps) {
     try {
       setIsLoading(true);
       const amount = parseInt(depositAmount);
+      console.log('📊 [DEPOSIT] Parsed amount:', amount);
 
       // Step 1: Approve ConfidentialToken
+      console.log('🔐 [DEPOSIT] Step 1: Creating encrypted approve input...');
       const approveInput = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.confidentialToken, address);
       approveInput.add32(amount);
+      console.log('🔒 [DEPOSIT] Encrypting approve input...');
       const approveEncryptedInput = await approveInput.encrypt();
+      console.log('✅ [DEPOSIT] Approve encrypted input created:', {
+        handles: approveEncryptedInput.handles,
+        inputProof: approveEncryptedInput.inputProof
+      });
 
-      await writeContract({
+      console.log('🔐 [DEPOSIT] Calling ConfidentialToken approve...');
+      const approveTx = await writeContract({
         address: CONTRACT_ADDRESSES.confidentialToken as `0x${string}`,
         abi: CONFIDENTIAL_TOKEN_ABI,
         functionName: 'approve',
         args: [CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`, approveEncryptedInput.handles[0], approveEncryptedInput.inputProof],
       });
+      console.log('✅ [DEPOSIT] Approve transaction initiated:', approveTx);
 
       // Step 2: Deposit tokens
+      console.log('📦 [DEPOSIT] Step 2: Creating encrypted deposit input...');
       const depositInput = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.secretAirdrop, address);
       depositInput.add32(amount);
+      console.log('🔒 [DEPOSIT] Encrypting deposit input...');
       const depositEncryptedInput = await depositInput.encrypt();
+      console.log('✅ [DEPOSIT] Deposit encrypted input created:', {
+        handles: depositEncryptedInput.handles,
+        inputProof: depositEncryptedInput.inputProof
+      });
 
-      await writeContract({
+      console.log('📦 [DEPOSIT] Calling SecretAirdrop depositTokens...');
+      const depositTx = await writeContract({
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'depositTokens',
         args: [depositEncryptedInput.handles[0], depositEncryptedInput.inputProof],
       });
+      console.log('✅ [DEPOSIT] Deposit transaction initiated:', depositTx);
 
+      console.log('🎉 [DEPOSIT] Process completed successfully!');
       setMessage({ type: 'success', text: `Successfully deposited ${amount} tokens to airdrop contract!` });
       setDepositAmount('');
     } catch (error) {
+      console.error('❌ [DEPOSIT] Error during deposit process:', error);
+      console.error('❌ [DEPOSIT] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? error.cause : undefined
+      });
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to deposit tokens' });
     } finally {
       setIsLoading(false);
+      console.log('🏁 [DEPOSIT] Process finished, loading state reset');
     }
   };
 
   const configureAirdrops = async () => {
+    console.log('🚀 [CONFIGURE] Starting configure airdrops process...');
+    console.log('📊 [CONFIGURE] fhevmInstance:', fhevmInstance);
+    console.log('📊 [CONFIGURE] address:', address);
+    console.log('📊 [CONFIGURE] recipientData:', recipientData);
+    
     if (!fhevmInstance || !address || !recipientData) {
+      console.error('❌ [CONFIGURE] Missing required parameters:', { fhevmInstance, address, recipientData });
       setMessage({ type: 'error', text: 'Please connect wallet and enter recipient data' });
       return;
     }
@@ -154,6 +328,7 @@ export function SetupTab({}: SetupTabProps) {
     try {
       setIsLoading(true);
       
+      console.log('📋 [CONFIGURE] Parsing recipient data...');
       const lines = recipientData.split('\n').filter(line => line.trim());
       const recipients: string[] = [];
       const amounts: number[] = [];
@@ -178,25 +353,52 @@ export function SetupTab({}: SetupTabProps) {
         recipients.push(recipientAddress);
         amounts.push(amount);
       }
+      
+      console.log('✅ [CONFIGURE] Parsed recipients and amounts:', {
+        recipients: recipients,
+        amounts: amounts,
+        count: recipients.length
+      });
 
       // Create encrypted inputs
+      console.log('🔒 [CONFIGURE] Creating encrypted inputs for amounts...');
       const input = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.secretAirdrop, address);
-      amounts.forEach(amount => input.add32(amount));
+      amounts.forEach((amount, index) => {
+        console.log(`🔒 [CONFIGURE] Adding amount ${amount} for recipient ${index}: ${recipients[index]}`);
+        input.add32(amount);
+      });
+      
+      console.log('🔒 [CONFIGURE] Encrypting inputs...');
       const encryptedInput = await input.encrypt();
+      console.log('✅ [CONFIGURE] Encrypted inputs created:', {
+        handles: encryptedInput.handles,
+        inputProof: encryptedInput.inputProof,
+        handleCount: encryptedInput.handles.length
+      });
 
-      await writeContract({
+      console.log('📦 [CONFIGURE] Calling SecretAirdrop configureAirdrops...');
+      const configureTx = await writeContract({
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'configureAirdrops',
         args: [recipients as `0x${string}`[], encryptedInput.handles, encryptedInput.inputProof],
       });
+      console.log('✅ [CONFIGURE] Configure transaction initiated:', configureTx);
 
+      console.log('🎉 [CONFIGURE] Process completed successfully!');
       setMessage({ type: 'success', text: `Successfully configured airdrops for ${recipients.length} recipients!` });
       setRecipientData('');
     } catch (error) {
+      console.error('❌ [CONFIGURE] Error during configure process:', error);
+      console.error('❌ [CONFIGURE] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? error.cause : undefined
+      });
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to configure airdrops' });
     } finally {
       setIsLoading(false);
+      console.log('🏁 [CONFIGURE] Process finished, loading state reset');
     }
   };
 
@@ -215,13 +417,86 @@ export function SetupTab({}: SetupTabProps) {
               placeholder="1000"
             />
           </div>
-          <button 
-            style={buttonStyle} 
-            onClick={approveAndWrap}
-            disabled={isLoading || isConfirming}
-          >
-            {isLoading || isConfirming ? 'Processing...' : 'Approve & Wrap Tokens'}
-          </button>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button 
+              style={{ 
+                ...buttonStyle, 
+                background: isApproved ? '#95a5a6' : (approveHash && !isApproved) ? '#f39c12' : '#3498db',
+                opacity: isApproved ? 0.7 : 1 
+              }} 
+              onClick={approveGameCoin}
+              disabled={approveLoading || isConfirming || isApproved}
+            >
+              {approveLoading 
+                ? 'Sending...' 
+                : isConfirming && approveHash 
+                ? 'Confirming...' 
+                : isApproved 
+                ? '✅ Approved' 
+                : '1. Approve GameCoin'
+              }
+            </button>
+            <button 
+              style={{ 
+                ...buttonStyle, 
+                background: isApproved ? '#27ae60' : '#bdc3c7',
+                cursor: isApproved ? 'pointer' : 'not-allowed'
+              }} 
+              onClick={wrapToConfidential}
+              disabled={wrapLoading || isConfirming || !isApproved}
+            >
+              {wrapLoading || isConfirming 
+                ? 'Wrapping...' 
+                : '2. Wrap to Confidential'
+              }
+            </button>
+          </div>
+          {/* Status messages */}
+          {approveHash && !isApproved && (
+            <div style={{
+              background: '#fff3cd',
+              color: '#856404',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              marginTop: '10px'
+            }}>
+              ⏳ Approval transaction sent! Waiting for confirmation...
+            </div>
+          )}
+          {isApproved && (
+            <div style={{
+              background: '#e8f5e8',
+              color: '#27ae60',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              marginTop: '10px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>✅ GameCoin approved! You can now wrap to ConfidentialToken.</span>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #27ae60',
+                  color: '#27ae60',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  console.log('🔄 [STATE] Manual approval reset');
+                  setIsApproved(false);
+                  setApproveHash(null);
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          )}
           
           <div style={formGroupStyle}>
             <label style={labelStyle}>Amount to Deposit (for Airdrop):</label>

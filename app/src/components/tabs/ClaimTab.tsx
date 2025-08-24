@@ -73,30 +73,47 @@ export function ClaimTab({}: ClaimTabProps) {
   };
 
   const claimAirdrop = async () => {
+    console.log('🚀 [CLAIM] Starting claim airdrop process...');
+    console.log('📊 [CLAIM] address:', address);
+    console.log('📊 [CLAIM] hasAirdrop:', hasAirdrop);
+    console.log('📊 [CLAIM] hasClaimed:', hasClaimed);
+    
     if (!address) {
+      console.error('❌ [CLAIM] No wallet address');
       setMessage({ type: 'error', text: 'Please connect your wallet' });
       return;
     }
 
     if (!hasAirdrop) {
+      console.error('❌ [CLAIM] No airdrop configured for address:', address);
       setMessage({ type: 'error', text: 'No airdrop configured for your address' });
       return;
     }
 
     if (hasClaimed) {
+      console.error('❌ [CLAIM] Airdrop already claimed for address:', address);
       setMessage({ type: 'error', text: 'Airdrop already claimed' });
       return;
     }
 
     try {
-      await writeContract({
+      console.log('🎁 [CLAIM] Calling SecretAirdrop claimAirdrop...');
+      const claimTx = await writeContract({
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'claimAirdrop',
       });
+      console.log('✅ [CLAIM] Claim transaction initiated:', claimTx);
 
+      console.log('🎉 [CLAIM] Claim process completed successfully!');
       setMessage({ type: 'success', text: 'Airdrop claimed successfully!' });
     } catch (error) {
+      console.error('❌ [CLAIM] Error during claim process:', error);
+      console.error('❌ [CLAIM] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? error.cause : undefined
+      });
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to claim airdrop' });
     }
   };
