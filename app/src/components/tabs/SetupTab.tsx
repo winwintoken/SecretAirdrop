@@ -409,7 +409,7 @@ export function SetupTab({ }: SetupTabProps) {
 
       console.log('📋 [CONFIGURE] Parsing recipient data...');
       const lines = recipientData.split('\n').filter(line => line.trim());
-      const recipients: string[] = [];
+      const recipients: `0x${string}`[] = [];
       const amounts: number[] = [];
 
       for (const line of lines) {
@@ -444,7 +444,7 @@ export function SetupTab({ }: SetupTabProps) {
       const input = fhevmInstance.createEncryptedInput(CONTRACT_ADDRESSES.secretAirdrop, address);
       amounts.forEach((amount, index) => {
         console.log(`🔒 [CONFIGURE] Adding amount ${amount} for recipient ${index}: ${recipients[index]}`);
-        input.add32(amount);
+        input.add64(amount);
       });
 
       console.log('🔒 [CONFIGURE] Encrypting inputs...');
@@ -455,12 +455,17 @@ export function SetupTab({ }: SetupTabProps) {
         handleCount: encryptedInput.handles.length
       });
 
+      for (let index = 0; index < encryptedInput.handles.length; index++) {
+        // const element = encryptedInput.handles[index];
+        encryptedInput.handles[index] = convertHandle(encryptedInput.handles[index])
+      }
+
       console.log('📦 [CONFIGURE] Calling SecretAirdrop configureAirdrops...');
       writeContract({
         address: CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`,
         abi: SECRET_AIRDROP_ABI,
         functionName: 'configureAirdrops',
-        args: [recipients as `0x${string}`[], encryptedInput.handles, encryptedInput.inputProof],
+        args: [recipients, encryptedInput.handles, convertHandle(encryptedInput.inputProof)],
       });
       console.log('✅ [CONFIGURE] Configure transaction initiated');
 
