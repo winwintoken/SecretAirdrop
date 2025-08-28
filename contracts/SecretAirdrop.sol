@@ -76,7 +76,7 @@ contract SecretAirdrop is SepoliaConfig {
      * @param encryptedAmount External encrypted amount to deposit
      * @param inputProof Proof for the encrypted input
      */
-    function depositTokens(externalEuint64 encryptedAmount, bytes calldata inputProof) external onlyProjectOwner {
+    function depositTokens(externalEuint64 encryptedAmount, bytes calldata inputProof) external {
         euint64 amount = FHE.fromExternal(encryptedAmount, inputProof);
         console.log("depositTokens 1");
         // Transfer encrypted tokens from project owner to this contract
@@ -103,7 +103,7 @@ contract SecretAirdrop is SepoliaConfig {
         address[] calldata _recipients,
         externalEuint64[] calldata encryptedAmounts,
         bytes calldata inputProof
-    ) external onlyProjectOwner {
+    ) external {
         require(_recipients.length == encryptedAmounts.length, "Recipients and amounts length mismatch");
 
         for (uint256 i = 0; i < _recipients.length; i++) {

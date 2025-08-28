@@ -13,9 +13,9 @@ export function EncryptedBalance({ ciphertextHandle, label, unit = 'tokens' }: E
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [decryptedValue, setDecryptedValue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { address } = useAccount();
-  const { instance: fhevmInstance } = useFHEVM();
+  const { instance: fhevmInstance, initFHEVM } = useFHEVM();
   const { data: walletClient } = useWalletClient();
 
   const buttonStyle = {
@@ -31,6 +31,8 @@ export function EncryptedBalance({ ciphertextHandle, label, unit = 'tokens' }: E
   };
 
   const decryptBalance = async () => {
+    console.log("ciphertextHandle:", ciphertextHandle, fhevmInstance, address, walletClient);
+
     if (!fhevmInstance || !address || !walletClient || !ciphertextHandle) {
       setError('Missing requirements for decryption');
       return;
@@ -90,10 +92,10 @@ export function EncryptedBalance({ ciphertextHandle, label, unit = 'tokens' }: E
 
       const decryptedBalance = result[ciphertextHandle];
       console.log('✅ [DECRYPT] Decrypted balance:', decryptedBalance);
-      
+
       // Convert the decrypted value to a readable format
       // Since it's stored as amount * 1000000 (for precision), divide by 1000000
-      const readableBalance = (Number(decryptedBalance) / 1000000).toFixed(6);
+      const readableBalance = (Number(decryptedBalance)).toFixed(2);
       setDecryptedValue(readableBalance);
     } catch (error) {
       console.error('❌ [DECRYPT] Decryption failed:', error);
@@ -125,13 +127,23 @@ export function EncryptedBalance({ ciphertextHandle, label, unit = 'tokens' }: E
       ) : (
         <>
           ***
-          <button
-            style={buttonStyle}
-            onClick={decryptBalance}
-            disabled={isDecrypting}
-          >
-            {isDecrypting ? 'Decrypting...' : 'Decrypt'}
-          </button>
+          {!fhevmInstance ? (
+            <button
+              style={{ ...buttonStyle, background: '#f39c12' }}
+              onClick={initFHEVM}
+              disabled={isDecrypting}
+            >
+              Initialize FHE
+            </button>
+          ) : (
+            <button
+              style={buttonStyle}
+              onClick={decryptBalance}
+              disabled={isDecrypting}
+            >
+              {isDecrypting ? 'Decrypting...' : 'Decrypt'}
+            </button>
+          )}
         </>
       )}
       {error && (

@@ -621,13 +621,13 @@ export function SetupTab({ }: SetupTabProps) {
           <button
             style={{
               ...buttonStyle,
-              background: isReallyOperatorSet ? '#27ae60' : '#bdc3c7',
-              cursor: isReallyOperatorSet ? 'pointer' : 'not-allowed'
+              background: isReallyOperatorSet && fhevmInstance ? '#27ae60' : '#bdc3c7',
+              cursor: isReallyOperatorSet && fhevmInstance ? 'pointer' : 'not-allowed'
             }}
             onClick={depositTokens}
-            disabled={isLoading || isConfirming || !isReallyOperatorSet}
+            disabled={isLoading || isConfirming || !isReallyOperatorSet || !fhevmInstance}
           >
-            {isLoading || isConfirming ? 'Processing...' : 'Deposit to Airdrop'}
+            {!fhevmInstance ? 'Initialize FHE First' : isLoading || isConfirming ? 'Processing...' : 'Deposit to Airdrop'}
           </button>
         </div>
       </div>
@@ -644,11 +644,15 @@ export function SetupTab({ }: SetupTabProps) {
           />
         </div>
         <button
-          style={{ ...buttonStyle, background: '#f39c12' }}
+          style={{
+            ...buttonStyle,
+            background: fhevmInstance ? '#f39c12' : '#bdc3c7',
+            cursor: fhevmInstance ? 'pointer' : 'not-allowed'
+          }}
           onClick={configureAirdrops}
-          disabled={isLoading || isConfirming}
+          disabled={isLoading || isConfirming || !fhevmInstance}
         >
-          {isLoading || isConfirming ? 'Processing...' : 'Configure Airdrops'}
+          {!fhevmInstance ? 'Initialize FHE First' : isLoading || isConfirming ? 'Processing...' : 'Configure Airdrops'}
         </button>
       </div>
 
