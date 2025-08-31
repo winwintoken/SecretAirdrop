@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
 import { useFHEVM } from '../hooks/useFHEVM';
 import { CONTRACT_ADDRESSES } from '../config/contracts';

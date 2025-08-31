@@ -23,7 +23,6 @@ export function SetupTab({ }: SetupTabProps) {
   const [isWaitingForApproval, setIsWaitingForApproval] = useState(false);
 
   // Track operator status
-  const [isOperatorSet, setIsOperatorSet] = useState(false);
   const [operatorHash, setOperatorHash] = useState<string | null>(null);
 
   const { address } = useAccount();
@@ -51,7 +50,7 @@ export function SetupTab({ }: SetupTabProps) {
     abi: GAME_COIN_ABI,
     functionName: 'allowance',
     args: [address as `0x${string}`, CONTRACT_ADDRESSES.confidentialToken as `0x${string}`],
-    enabled: !!address && !!wrapAmount,
+    query: { enabled: !!address && !!wrapAmount },
   });
 
   // Check if SecretAirdrop is set as operator for ConfidentialToken
@@ -60,7 +59,7 @@ export function SetupTab({ }: SetupTabProps) {
     abi: CONFIDENTIAL_TOKEN_ABI,
     functionName: 'isOperator',
     args: [address as `0x${string}`, CONTRACT_ADDRESSES.secretAirdrop as `0x${string}`],
-    enabled: !!address,
+    query: { enabled: !!address },
   });
 
   // Calculate if approval is sufficient
