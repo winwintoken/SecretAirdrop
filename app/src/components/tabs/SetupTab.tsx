@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { parseEther, isAddress, formatEther } from 'viem';
-import { GAME_COIN_ABI, CONFIDENTIAL_TOKEN_ABI, SECRET_AIRDROP_ABI } from '../../types/contracts';
-import { useFHEVM } from '../../hooks/useFHEVM';
-import { CONTRACT_ADDRESSES } from '../../config/contracts';
+import { GAME_COIN_ABI, CONFIDENTIAL_TOKEN_ABI, SECRET_AIRDROP_ABI } from '@/types/contracts';
+import { useFHEVM } from '@/hooks/useFHEVM';
+import { CONTRACT_ADDRESSES } from '@/config/contracts';
 
 interface SetupTabProps { }
 

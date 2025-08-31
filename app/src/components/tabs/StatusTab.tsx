@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useReadContract } from 'wagmi';
-import { SECRET_AIRDROP_ABI } from '../../types/contracts';
-import { CONTRACT_ADDRESSES } from '../../config/contracts';
+import { SECRET_AIRDROP_ABI } from '@/types/contracts';
+import { CONTRACT_ADDRESSES } from '@/config/contracts';
 
 interface StatusTabProps {}
 

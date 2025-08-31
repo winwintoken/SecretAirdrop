@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { formatEther } from 'viem';
-import { GAME_COIN_ABI, SECRET_AIRDROP_ABI, CONFIDENTIAL_TOKEN_ABI } from '../../types/contracts';
-import { CONTRACT_ADDRESSES } from '../../config/contracts';
+import { GAME_COIN_ABI, SECRET_AIRDROP_ABI, CONFIDENTIAL_TOKEN_ABI } from '@/types/contracts';
+import { CONTRACT_ADDRESSES } from '@/config/contracts';
 import { EncryptedBalance } from '../EncryptedBalance';
 
 interface ClaimTabProps { }

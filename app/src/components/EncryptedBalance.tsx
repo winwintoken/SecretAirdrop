@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
-import { useFHEVM } from '../hooks/useFHEVM';
-import { CONTRACT_ADDRESSES } from '../config/contracts';
+import { useFHEVM } from '@/hooks/useFHEVM';
+import { CONTRACT_ADDRESSES } from '@/config/contracts';
 
 interface EncryptedBalanceProps {
   ciphertextHandle: string | null;
