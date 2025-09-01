@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useReadContract } from 'wagmi';
-import { SECRET_AIRDROP_ABI } from '@/types/contracts';
+import { SECRET_AIRDROP_ABI } from '@/type/contracts';
 import { CONTRACT_ADDRESSES } from '@/config/contracts';
 
-interface StatusTabProps {}
+interface StatusTabProps { }
 
 interface Recipient {
   address: string;
   hasClaimed: boolean;
 }
 
-export function StatusTab({}: StatusTabProps) {
+export function StatusTab({ }: StatusTabProps) {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
